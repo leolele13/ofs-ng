@@ -67,12 +67,16 @@ class ScriptTimelineWindow {
         // Empty-area click — resolves to seek (release) or box-select (drag)
         bool emptyClickPending = false;
         double emptyClickTime = 0.0;
+        float emptyClickRelY = 0.0f; // 0..1 within the gesture band (active lane / overlay)
     };
 
     struct SelectionState {
         bool isSelecting = false;
-        double absSelStart = 0.0;
-        double relSelEnd = 0.0;
+        double absSelStart = 0.0;   // time at press
+        double relSelEnd = 0.0;     // X relative 0..1 within the script line
+        float relSelStartY = 0.0f;  // Y relative 0..1 within the gesture band at press
+        float relSelEndY = 0.0f;    // Y relative 0..1 as the drag updates
+        bool timeOnly = false;      // Alt held during the marquee → ignore Y (full 0..100)
     };
 
     // Drag across left-strip rows to build a multi-axis editing group. anchorRow is the row the drag

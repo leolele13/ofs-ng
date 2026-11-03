@@ -120,6 +120,25 @@ struct MoveSelectionTimeEvent {
     bool fanToGroup = true; // see AddActionAtTimeEvent::fanToGroup
 };
 
+// Set every selected action's pos to an absolute value (clamped 0..100). Used by the timeline's
+// batch-edit modal; keyboard nudges keep using MoveSelectionPositionEvent (delta).
+struct SetSelectionPositionEvent {
+    StandardAxis axis;
+    int pos = 0;
+    bool snapshot = true;
+    bool fanToGroup = true;
+};
+
+// Shift every selected action by an absolute time delta (seconds), snapped onto the authored-time
+// grid. Collision with an unselected neighbour skips that axis member (same rule as MoveSelectionTime).
+struct OffsetSelectionTimeEvent {
+    StandardAxis axis;
+    double deltaSeconds = 0.0;
+    bool seekAfter = false;
+    bool snapshot = true;
+    bool fanToGroup = true;
+};
+
 struct MoveActionToCurrentTimeEvent {
     StandardAxis axis;
     bool fanToGroup = true; // see AddActionAtTimeEvent::fanToGroup

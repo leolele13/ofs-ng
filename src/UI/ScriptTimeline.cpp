@@ -730,10 +730,10 @@ void ScriptTimelineWindow::renderScriptLines(const ScriptProject &project, ImDra
             drawList->PopClipRect();
     }
 
-    // Selection box (a time range, drawn after the per-axis loop). The selection fans across the edit
-    // group, so the marquee shows where it lands: in Overlay the stacked axes share one band, so it spans
-    // the full height; in Lanes it is drawn over each active/grouped lane only — never the background lanes
-    // it won't touch.
+    // Selection box (time × intensity rectangle, drawn after the per-axis loop). The selection fans across
+    // the edit group, so the marquee shows where it lands: in Overlay the stacked axes share one band; in
+    // Lanes it is drawn over each active/grouped lane only — never the background lanes it won't touch.
+    // Default drag is a 2D rect (X=time, Y=intensity). Alt held → time-only (full lane height).
     if (selectionState.isSelecting) {
         auto relSel1 = (float)((selectionState.absSelStart - offsetTime) / viewState.visibleTime);
         auto rSel2 = (float)selectionState.relSelEnd;
@@ -743,12 +743,13 @@ void ScriptTimelineWindow::renderScriptLines(const ScriptProject &project, ImDra
         const ImU32 selectBg = ofs::theme::GetColorU32(AppCol_SelectionBoxFill);
         const float x0 = scriptLinePos.x + scriptLineSize.x * minRel;
         const float x1 = scriptLinePos.x + scriptLineSize.x * maxRel;
+        const float yRel0 = selectionState.timeOnly ? 0.f : std::min(selectionState.relSelStartY, selectionState.relSelEndY);
+        const float yRel1 = selectionState.timeOnly ? 1.f : std::max(selectionState.relSelStartY, selectionState.relSelEndY);
         auto drawBox = [&](const ImVec2 &bp, const ImVec2 &bs) {
-            ImVec2 selMin(x0, bp.y);
-            ImVec2 selMax(x1, bp.y + bs.y);
+            ImVec2 selMin(x0, bp.y + bs.y * yRel0);
+            ImVec2 selMax(x1, bp.y + bs.y * yRel1);
             drawList->AddRectFilled(selMin, selMax, selectBg);
-            drawList->AddLine(selMin, {selMin.x, selMax.y}, selectColor, 3.0f);
-            drawList->AddLine({selMax.x, selMin.y}, selMax, selectColor, 3.0f);
+            drawList->AddRect(selMin, selMax, selectColor, 0.f, 2.0f);
         };
         if (lanes) {
             for (int li = 0; li < scriptLineCount; ++li)
@@ -1048,6 +1049,10 @@ void ScriptTimelineWindow::renderTimeline(const ScriptProject &project, EventQue
                 editState.emptyClickPending = true;
                 editState.emptyClickTime =
                     screenXToTime(mouseX, viewState.visibleTime, offsetTime, scriptLinePos, scriptLineSize);
+                // Relative Y within the gesture band (active lane / overlay). Screen Y grows downward;
+                // intensity grows upward, so invert when converting to pos at commit.
+                const float bandH = std::max(gestureLane.size.y, 1.f);
+                editState.emptyClickRelY = std::clamp((mouseY - gestureLane.pos.y) / bandH, 0.f, 1.f);
             }
         } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
             // Open on release, matching the region band's context menu (BandBar) so right-click feels
@@ -1089,6 +1094,56 @@ void ScriptTimelineWindow::renderContextMenu(const ScriptProject &project, Event
                                               .startTime = minAt,
                                               .endTime = maxAt,
                                               .timelineDuration = videoPlayer.getDuration()});
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::MenuItem(Str::TlBatchEdit.iconId(ICON_EDIT, "tl_batch_edit"))) {
+                    const StandardAxis axis = ctxAxis;
+                    showCustomModal(
+                        eq, {.title = Str::TlBatchEditTitle.c_str(),
+                             .width = 360.0f,
+                             .body = [axis, eqp = &eq, setPos = 50, offsetPos = 0, offsetMs = 0,
+                                      applySet = false, applyOffsetPos = false,
+                                      applyOffsetTime = false]() mutable -> bool {
+                                 ImGui::Checkbox(Str::TlBatchSetPos.id("tl_batch_set_pos"), &applySet);
+                                 ImGui::BeginDisabled(!applySet);
+                                 ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.f);
+                                 ImGui::SliderInt("##tl_batch_set_pos_val", &setPos, 0, 100);
+                                 ImGui::EndDisabled();
+
+                                 ImGui::Checkbox(Str::TlBatchOffsetPos.id("tl_batch_offset_pos"), &applyOffsetPos);
+                                 ImGui::BeginDisabled(!applyOffsetPos);
+                                 ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.f);
+                                 ImGui::InputInt("##tl_batch_offset_pos_val", &offsetPos);
+                                 ImGui::EndDisabled();
+
+                                 ImGui::Checkbox(Str::TlBatchOffsetTime.id("tl_batch_offset_time"), &applyOffsetTime);
+                                 ImGui::BeginDisabled(!applyOffsetTime);
+                                 ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.f);
+                                 ImGui::InputInt("##tl_batch_offset_ms_val", &offsetMs);
+                                 ImGui::EndDisabled();
+
+                                 ImGui::Spacing();
+                                 const bool any = applySet || applyOffsetPos || applyOffsetTime;
+                                 ImGui::BeginDisabled(!any);
+                                 if (ImGui::Button(Str::TlBatchApply.id("tl_batch_apply"),
+                                                   {ImGui::GetFontSize() * 6.f, 0.f})) {
+                                     if (applySet)
+                                         eqp->push(SetSelectionPositionEvent{.axis = axis, .pos = setPos});
+                                     if (applyOffsetPos && offsetPos != 0)
+                                         eqp->push(MoveSelectionPositionEvent{.axis = axis, .delta = offsetPos});
+                                     if (applyOffsetTime && offsetMs != 0)
+                                         eqp->push(OffsetSelectionTimeEvent{
+                                             .axis = axis, .deltaSeconds = static_cast<double>(offsetMs) / 1000.0});
+                                     ImGui::EndDisabled();
+                                     return true;
+                                 }
+                                 ImGui::EndDisabled();
+                                 ImGui::SameLine();
+                                 if (ImGui::Button(Str::TlBatchCancel.id("tl_batch_cancel"),
+                                                   {ImGui::GetFontSize() * 6.f, 0.f}))
+                                     return true;
+                                 return false;
+                             }});
                     ImGui::CloseCurrentPopup();
                 }
             }
@@ -1333,7 +1388,17 @@ void ScriptTimelineWindow::render(const ScriptProject &project, EventQueue &eq, 
 
     if (selectionState.isSelecting) {
         float mouseX = ImGui::GetMousePos().x;
+        float mouseY = ImGui::GetMousePos().y;
         selectionState.relSelEnd = std::clamp((mouseX - scriptLinePos.x) / scriptLineSize.x, 0.0f, 1.0f);
+        // Map Y against the same gesture band the empty-click started in (active lane / overlay).
+        const LaneRect selLane = lanes ? laneRectForAxis(project, laneLayout_, project.state.activeAxis)
+                                       : LaneRect{.pos = scriptLinePos, .size = scriptLineSize};
+        const float bandH = std::max(selLane.size.y, 1.f);
+        selectionState.relSelEndY = std::clamp((mouseY - selLane.pos.y) / bandH, 0.f, 1.f);
+        // Alt during box-select expands to full intensity (time-only marquee). Point/band drags still
+        // use Alt as cancel elsewhere; box-select has nothing to snap back, so this is free.
+        selectionState.timeOnly =
+            ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt);
     }
 
     renderTimeline(project, eq, videoPlayer, waveform, outerPos,
@@ -1447,6 +1512,9 @@ void ScriptTimelineWindow::render(const ScriptProject &project, EventQueue &eq, 
                 if (!activeAx.isLocked) {
                     selectionState.isSelecting = true;
                     selectionState.absSelStart = editState.emptyClickTime;
+                    selectionState.relSelStartY = editState.emptyClickRelY;
+                    selectionState.relSelEndY = editState.emptyClickRelY;
+                    selectionState.timeOnly = false;
                 }
             }
             editState.emptyClickPending = false;
@@ -1506,7 +1574,7 @@ void ScriptTimelineWindow::render(const ScriptProject &project, EventQueue &eq, 
         }
     }
 
-    // Box selection commit
+    // Box selection commit (time × intensity, unless Alt made it time-only)
     if (selectionState.isSelecting && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
         selectionState.isSelecting = false;
         double relSel1 = (selectionState.absSelStart - offsetTime) / viewState.visibleTime;
@@ -1514,7 +1582,21 @@ void ScriptTimelineWindow::render(const ScriptProject &project, EventQueue &eq, 
         double maxRel = std::max(relSel1, selectionState.relSelEnd);
         double startTime = offsetTime + viewState.visibleTime * minRel;
         double endTime = offsetTime + viewState.visibleTime * maxRel;
-        if (endTime - startTime > 0.008) {
+        // Screen Y grows downward while intensity grows upward — invert the relative Y to pos.
+        const float y0 = std::min(selectionState.relSelStartY, selectionState.relSelEndY);
+        const float y1 = std::max(selectionState.relSelStartY, selectionState.relSelEndY);
+        int startPos = 0;
+        int endPos = 100;
+        if (!selectionState.timeOnly) {
+            startPos = std::clamp(static_cast<int>(std::lround((1.f - y1) * 100.f)), 0, 100);
+            endPos = std::clamp(static_cast<int>(std::lround((1.f - y0) * 100.f)), 0, 100);
+            if (startPos > endPos)
+                std::swap(startPos, endPos);
+        }
+        // Tiny time span AND tiny intensity span → treat as a failed click, not a selection.
+        const bool meaningfulTime = endTime - startTime > 0.008;
+        const bool meaningfulPos = selectionState.timeOnly || (endPos - startPos) >= 1;
+        if (meaningfulTime && meaningfulPos) {
             bool additive = ImGui::IsKeyDown(ImGuiKey_LeftCtrl) || ImGui::IsKeyDown(ImGuiKey_RightCtrl);
             if (project.state.activeAxis < StandardAxis::Count) {
                 const auto &activeAx = project.axes[static_cast<size_t>(project.state.activeAxis)];
@@ -1523,6 +1605,8 @@ void ScriptTimelineWindow::render(const ScriptProject &project, EventQueue &eq, 
                                                .axis = project.state.activeAxis,
                                                .startTime = startTime,
                                                .endTime = endTime,
+                                               .startPos = startPos,
+                                               .endPos = endPos,
                                                .additive = additive});
             }
         }

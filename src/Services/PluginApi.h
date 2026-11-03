@@ -310,7 +310,7 @@ typedef struct {
 
 // Selection gesture — which selection-authoring gesture a request carries. MUST match SelectGesture in
 // IntentEvents.h (and SelectGesture in Ofs.Api/Selection.cs).
-//   Box   : marquee / time-range — every action with time in [startTime,endTime] (native ignores pos)
+//   Box   : marquee — every action with time in [startTime,endTime] AND pos in [startPos,endPos]
 //   All   : select-all (Ctrl+A) — every action on the axis
 //   Point : click / Ctrl-click   — the action at {startTime,pos} (startTime == endTime)
 typedef enum { OfsSelectBox = 0, OfsSelectAll = 1, OfsSelectPoint = 2 } OfsSelectGesture;
@@ -326,6 +326,8 @@ typedef struct {
     double startTime; // Box: range start; Point: the time
     double endTime;   // Box: range end (== startTime for Point)
     int pos;          // Point: the clicked pos
+    int startPos;     // Box: inclusive intensity floor (0-100); unused for Point/All
+    int endPos;       // Box: inclusive intensity ceiling (0-100); unused for Point/All
 } OfsSelectRequest;
 
 // Selection-mode onSelect disposition (the callback's return value), parallel to OfsEditDisposition.
@@ -415,10 +417,11 @@ static_assert(offsetof(OfsNavigatorDef, id) == 0 && offsetof(OfsNavigatorDef, di
                   offsetof(OfsNavigatorDef, userData) == 48,
               "OfsNavigatorDef field drift");
 
-static_assert(sizeof(OfsSelectRequest) == 32, "OfsSelectRequest layout drift");
+static_assert(sizeof(OfsSelectRequest) == 40, "OfsSelectRequest layout drift");
 static_assert(offsetof(OfsSelectRequest, gesture) == 0 && offsetof(OfsSelectRequest, axis) == 4 &&
                   offsetof(OfsSelectRequest, startTime) == 8 && offsetof(OfsSelectRequest, endTime) == 16 &&
-                  offsetof(OfsSelectRequest, pos) == 24,
+                  offsetof(OfsSelectRequest, pos) == 24 && offsetof(OfsSelectRequest, startPos) == 28 &&
+                  offsetof(OfsSelectRequest, endPos) == 32,
               "OfsSelectRequest field drift");
 
 static_assert(sizeof(OfsSelectModeDef) == 56, "OfsSelectModeDef layout drift");

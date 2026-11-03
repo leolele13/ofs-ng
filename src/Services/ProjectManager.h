@@ -120,6 +120,8 @@ class ProjectManager {
     void onOverlaySettingsChanged(const OverlaySettingsChangedEvent &event);
     void onMoveSelectionPosition(const MoveSelectionPositionEvent &event);
     void onMoveSelectionTime(const MoveSelectionTimeEvent &event);
+    void onSetSelectionPosition(const SetSelectionPositionEvent &event);
+    void onOffsetSelectionTime(const OffsetSelectionTimeEvent &event);
     void onMoveActionToCurrentTime(const MoveActionToCurrentTimeEvent &event);
     void onPasteActions(const PasteActionsEvent &event);
     void onRemoveActionAtTime(const RemoveActionAtTimeEvent &event);

@@ -158,6 +158,8 @@ namespace Ofs
         public double StartTime;
         public double EndTime;
         public int Pos;
+        public int StartPos;
+        public int EndPos;
     }
 
     [StructLayout(LayoutKind.Sequential)]

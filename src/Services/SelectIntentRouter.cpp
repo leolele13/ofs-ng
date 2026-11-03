@@ -11,6 +11,7 @@
 #include "Services/SelectionModeRegistry.h"
 #include "Util/Log.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace ofs {
@@ -41,10 +42,11 @@ template <class F> void forEachEditable(ScriptProject &p, AxisRoles roles, F &&f
 }
 
 // The built-in candidate set for one axis under a gesture — what the native mode (and a plugin mode's
-// Pass) selects. All takes the whole axis; Box/Point take every action with time in
-// [startTime,endTime] (pos ignored). A transposed range yields
-// nothing (iterating lowerBound past upperBound is UB; the UI always sends an ordered range, but don't
-// trust the caller). Point sends startTime == endTime, so a click never trips the guard.
+// Pass) selects. All takes the whole axis; Box takes every action with time in [startTime,endTime]
+// and pos in [startPos,endPos] (inclusive; defaults 0..100 keep the historical time-only marquee);
+// Point takes the (usually single) action at startTime==endTime (pos still ignored for lookup —
+// `at` is the VectorSet key). A transposed time range yields nothing (iterating lowerBound past
+// upperBound is UB; the UI always sends an ordered range, but don't trust the caller).
 VectorSet<ScriptAxisAction> nativeCandidates(const AxisState &axis, const SelectRequestEvent &event) {
     if (event.gesture == SelectGesture::All)
         return axis.actions;
@@ -52,7 +54,18 @@ VectorSet<ScriptAxisAction> nativeCandidates(const AxisState &axis, const Select
         return {};
     auto itStart = axis.actions.lowerBound(ScriptAxisAction{event.startTime, 0});
     auto itEnd = axis.actions.upperBound(ScriptAxisAction{event.endTime, 0});
-    return {itStart, itEnd};
+    if (event.gesture != SelectGesture::Box)
+        return {itStart, itEnd};
+    const int lo = std::min(event.startPos, event.endPos);
+    const int hi = std::max(event.startPos, event.endPos);
+    // Full-height defaults (0..100) keep every in-time action; otherwise filter intensity.
+    if (lo <= 0 && hi >= 100)
+        return {itStart, itEnd};
+    VectorSet<ScriptAxisAction> out;
+    for (auto it = itStart; it != itEnd; ++it)
+        if (it->pos >= lo && it->pos <= hi)
+            out.insert(*it);
+    return out;
 }
 
 // Resolve plugin-emitted {at,pos} pairs back to the real actions on the axis. An emitted action whose
@@ -130,7 +143,9 @@ void SelectIntentRouter::resolve(const SelectRequestEvent &event, const Selectio
                                   .axis = static_cast<int>(role),
                                   .startTime = event.startTime,
                                   .endTime = event.endTime,
-                                  .pos = event.pos};
+                                  .pos = event.pos,
+                                  .startPos = event.startPos,
+                                  .endPos = event.endPos};
         std::vector<PluginAction> emitted;
         switch (mode->onSelect(mode->userData, &in, &collectEmitted, &emitted)) {
         case OfsSelectDrop:

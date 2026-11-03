@@ -167,6 +167,57 @@ TEST_CASE("MoveSelectionTime shifts selected times forward and the selection fol
     CHECK(ax.selection.size() == 3);       // selection re-points at the moved actions
 }
 
+// ── XY box select + batch edit ──────────────────────────────────────────────────
+TEST_CASE("SelectBox filters by intensity when startPos/endPos are narrowed") {
+    PmFixture f;
+    f.seedL0_3(); // pos 10,20,30 at times 1,2,3
+    f.send(ofs::SelectRequestEvent{.gesture = ofs::SelectGesture::Box,
+                                   .axis = StandardAxis::L0,
+                                   .startTime = 0.5,
+                                   .endTime = 3.5,
+                                   .startPos = 15,
+                                   .endPos = 25,
+                                   .additive = false});
+    auto &sel = f.project().axes[0].selection;
+    REQUIRE(sel.size() == 1);
+    CHECK(sel.contains(ofs::ScriptAxisAction{2.0, 0})); // only pos 20
+}
+
+TEST_CASE("SelectBox defaults (0..100) still select every in-time action") {
+    PmFixture f;
+    f.seedL0_3();
+    f.send(ofs::SelectRequestEvent{.gesture = ofs::SelectGesture::Box,
+                                   .axis = StandardAxis::L0,
+                                   .startTime = 0.5,
+                                   .endTime = 3.5});
+    CHECK(f.project().axes[0].selection.size() == 3);
+}
+
+TEST_CASE("SetSelectionPosition sets every selected action to an absolute pos") {
+    PmFixture f;
+    f.seedL0_3();
+    f.send(ofs::SelectRequestEvent{.gesture = ofs::SelectGesture::All, .axis = StandardAxis::L0});
+    f.send(ofs::SetSelectionPositionEvent{.axis = StandardAxis::L0, .pos = 55});
+    auto &acts = f.project().axes[0].actions;
+    CHECK(acts[0].pos == 55);
+    CHECK(acts[1].pos == 55);
+    CHECK(acts[2].pos == 55);
+}
+
+TEST_CASE("OffsetSelectionTime shifts selected times by an absolute delta") {
+    PmFixture f;
+    f.seedL0_3();
+    f.send(ofs::SelectRequestEvent{.gesture = ofs::SelectGesture::Box,
+                                   .axis = StandardAxis::L0,
+                                   .startTime = 1.5,
+                                   .endTime = 2.5}); // {2.0}
+    f.send(ofs::OffsetSelectionTimeEvent{.axis = StandardAxis::L0, .deltaSeconds = 0.5});
+    auto &ax = f.project().axes[0];
+    CHECK(ax.actions.contains(ofs::ScriptAxisAction{2.5, 0}));
+    CHECK_FALSE(ax.actions.contains(ofs::ScriptAxisAction{2.0, 0}));
+    CHECK(ax.selection.contains(ofs::ScriptAxisAction{2.5, 0}));
+}
+
 // ── Selection-mode seam: native fan-out, plugin resolvers, fallback ──────────────
 // These exercise SelectIntentRouter directly with plain C-ABI resolver function pointers — no CoreCLR, so
 // they run unconditionally (the real-plugin path is covered in the plugins suite). They pin the router

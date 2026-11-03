@@ -2579,6 +2579,34 @@ translation = "删除"
 english     = "Add Processing Region"
 translation = "添加处理区域"
 
+[TlBatchEdit]
+english     = "Batch Edit Selection"
+translation = "批量编辑所选"
+
+[TlBatchEditTitle]
+english     = "Batch Edit Selection"
+translation = "批量编辑所选"
+
+[TlBatchSetPos]
+english     = "Set intensity"
+translation = "设置力度"
+
+[TlBatchOffsetPos]
+english     = "Offset intensity"
+translation = "力度偏移"
+
+[TlBatchOffsetTime]
+english     = "Offset time (ms)"
+translation = "时间偏移 (毫秒)"
+
+[TlBatchApply]
+english     = "Apply"
+translation = "应用"
+
+[TlBatchCancel]
+english     = "Cancel"
+translation = "取消"
+
 [TlShowPoints]
 english     = "Show points"
 translation = "显示节点"

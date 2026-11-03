@@ -2734,6 +2734,34 @@ description = "Timeline right-click menus — delete the scratch axis (script-li
 english     = "Add Processing Region"
 description = "Timeline script-line right-click menu — create a processing region spanning the current selection."
 
+[TlBatchEdit]
+english     = "Batch Edit Selection"
+description = "Timeline script-line right-click menu — open the batch-edit modal for selected actions (intensity and time)."
+
+[TlBatchEditTitle]
+english     = "Batch Edit Selection"
+description = "Title of the timeline batch-edit modal for selected funscript actions."
+
+[TlBatchSetPos]
+english     = "Set intensity"
+description = "Batch-edit modal — absolute intensity (pos 0–100) applied to every selected action."
+
+[TlBatchOffsetPos]
+english     = "Offset intensity"
+description = "Batch-edit modal — signed intensity delta added to every selected action (clamped 0–100)."
+
+[TlBatchOffsetTime]
+english     = "Offset time (ms)"
+description = "Batch-edit modal — signed time shift in milliseconds applied to every selected action."
+
+[TlBatchApply]
+english     = "Apply"
+description = "Batch-edit modal — confirm and apply the chosen intensity/time edits."
+
+[TlBatchCancel]
+english     = "Cancel"
+description = "Batch-edit modal — dismiss without changing the selection."
+
 [TlShowPoints]
 english     = "Show points"
 description = "Timeline script-line right-click menu — toggle rendering and editing of the source action points."

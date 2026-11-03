@@ -83,6 +83,14 @@ UndoSystem::UndoSystem(ScriptProject &project, EventQueue &eq, size_t maxBytes)
         if (e.snapshot)
             push();
     });
+    eq.on<SetSelectionPositionEvent>([this](const SetSelectionPositionEvent &e) {
+        if (e.snapshot)
+            push();
+    });
+    eq.on<OffsetSelectionTimeEvent>([this](const OffsetSelectionTimeEvent &e) {
+        if (e.snapshot)
+            push();
+    });
     eq.on<MoveActionEvent>([this](const MoveActionEvent &e) {
         if (e.snapshot)
             push();

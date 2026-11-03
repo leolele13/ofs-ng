@@ -116,7 +116,7 @@ struct EditRequestEvent {
 // Which selection-authoring gesture a request carries; the active mode reinterprets what it means,
 // the native resolver reproduces today's behavior. Mirrors OfsSelectGesture in Ofs.Api.
 enum class SelectGesture {
-    Box,   // marquee drag / programmatic time-range: every action with time in [startTime,endTime]
+    Box,   // marquee drag: every action with time in [startTime,endTime] AND pos in [startPos,endPos]
     All,   // select-all (Ctrl+A): every action on the axis
     Point, // click / Ctrl-click: the action at {startTime,pos} (a degenerate single-time range)
 };
@@ -124,14 +124,17 @@ enum class SelectGesture {
 // The selection seam's request event. Every gesture that authors a selection (marquee, Ctrl+A,
 // click/Ctrl-click) pushes this instead of mutating the selection, so the active mode is consulted
 // once per editable axis, source-agnostically. `additive` (Ctrl held) is the host-owned combine
-// applied below the seam (toggle into the current selection vs. replace it); `pos` is carried for a
-// plugin mode — the native resolver ignores it, exactly as box-select ignores its vertical extent today.
+// applied below the seam (toggle into the current selection vs. replace it). For Box, native resolution
+// keeps actions whose time is in [startTime,endTime] and whose pos is in [startPos,endPos] (inclusive).
+// Defaults startPos=0 / endPos=100 reproduce the historical time-only marquee. Point still uses `pos`.
 struct SelectRequestEvent {
     SelectGesture gesture;
     StandardAxis axis;      // lead axis the user gestured on; the router fans across its edit group
     double startTime = 0.0; // Box: range start; Point: the clicked time (== endTime)
     double endTime = 0.0;   // Box: range end
     int pos = 0;            // Point: the clicked pos
+    int startPos = 0;       // Box: inclusive intensity/pos floor (0-100)
+    int endPos = 100;       // Box: inclusive intensity/pos ceiling (0-100)
     bool additive = false;  // Ctrl held: toggle into the current selection instead of replacing it
 };
 

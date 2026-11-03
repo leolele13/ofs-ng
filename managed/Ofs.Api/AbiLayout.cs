@@ -56,9 +56,9 @@ namespace Ofs
             Offsets<OfsNavigatorDef>(("Id", 0), ("DisplayName", 8), ("OnStep", 16), ("OnEnter", 24),
                 ("OnExit", 32), ("OnUi", 40), ("UserData", 48));
 
-            Size<OfsSelectRequest>(32);
+            Size<OfsSelectRequest>(40);
             Offsets<OfsSelectRequest>(("Gesture", 0), ("Axis", 4), ("StartTime", 8), ("EndTime", 16),
-                ("Pos", 24));
+                ("Pos", 24), ("StartPos", 28), ("EndPos", 32));
 
             Size<OfsSelectModeDef>(56);
             Offsets<OfsSelectModeDef>(("Id", 0), ("DisplayName", 8), ("OnSelect", 16), ("OnEnter", 24),

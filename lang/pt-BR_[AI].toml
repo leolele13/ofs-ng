@@ -2579,6 +2579,34 @@ translation = "Excluir"
 english     = "Add Processing Region"
 translation = "Adicionar Região de Processamento"
 
+[TlBatchEdit]
+english     = "Batch Edit Selection"
+translation = "Batch Edit Selection"
+
+[TlBatchEditTitle]
+english     = "Batch Edit Selection"
+translation = "Batch Edit Selection"
+
+[TlBatchSetPos]
+english     = "Set intensity"
+translation = "Set intensity"
+
+[TlBatchOffsetPos]
+english     = "Offset intensity"
+translation = "Offset intensity"
+
+[TlBatchOffsetTime]
+english     = "Offset time (ms)"
+translation = "Offset time (ms)"
+
+[TlBatchApply]
+english     = "Apply"
+translation = "Apply"
+
+[TlBatchCancel]
+english     = "Cancel"
+translation = "Cancel"
+
 [TlShowPoints]
 english     = "Show points"
 translation = "Mostrar pontos"

@@ -106,6 +106,8 @@ ProjectManager::ProjectManager(ScriptProject &project, EventQueue &eq, const App
     eq.on<OverlaySettingsChangedEvent>([this](const OverlaySettingsChangedEvent &e) { onOverlaySettingsChanged(e); });
     eq.on<MoveSelectionPositionEvent>([this](const MoveSelectionPositionEvent &e) { onMoveSelectionPosition(e); });
     eq.on<MoveSelectionTimeEvent>([this](const MoveSelectionTimeEvent &e) { onMoveSelectionTime(e); });
+    eq.on<SetSelectionPositionEvent>([this](const SetSelectionPositionEvent &e) { onSetSelectionPosition(e); });
+    eq.on<OffsetSelectionTimeEvent>([this](const OffsetSelectionTimeEvent &e) { onOffsetSelectionTime(e); });
     eq.on<MoveActionToCurrentTimeEvent>(
         [this](const MoveActionToCurrentTimeEvent &e) { onMoveActionToCurrentTime(e); });
     eq.on<CopySelectionEvent>([this](const CopySelectionEvent &e) { onCopySelection(e); });
@@ -1857,6 +1859,70 @@ void ProjectManager::onMoveSelectionTime(const MoveSelectionTimeEvent &event) {
     });
 
     if (event.seekAfter && leadSeek)
+        eq.push(SeekEvent{*leadSeek});
+}
+
+void ProjectManager::onSetSelectionPosition(const SetSelectionPositionEvent &event) {
+    const AxisRoles targets = editTargets(project, event.axis, event.fanToGroup);
+    const int pos = std::clamp(event.pos, 0, 100);
+    forEachEditable(project, targets, [&](StandardAxis role, AxisState &axis) {
+        if (axis.selection.empty())
+            return;
+        project.mutate(
+            role,
+            [pos](AxisState &a) {
+                auto sIt = a.selection.begin();
+                for (auto aIt = a.actions.begin(); aIt != a.actions.end() && sIt != a.selection.end(); ++aIt) {
+                    if (aIt->at == sIt->at) {
+                        aIt->pos = pos;
+                        ++sIt;
+                    }
+                }
+            },
+            eq);
+    });
+}
+
+void ProjectManager::onOffsetSelectionTime(const OffsetSelectionTimeEvent &event) {
+    const AxisRoles targets = editTargets(project, event.axis, event.fanToGroup);
+    const double delta = event.deltaSeconds;
+    if (delta == 0.0)
+        return;
+    std::optional<double> leadSeek;
+    auto nudged = [delta](double at) { return snapAuthoredTime(at + delta); };
+
+    forEachEditable(project, targets, [&](StandardAxis role, AxisState &axis) {
+        auto isSelected = [&](double at) { return axis.selection.contains(ScriptAxisAction{at, 0}); };
+        if (axis.selection.empty())
+            return;
+        for (const auto &action : axis.selection) {
+            double newAt = nudged(action.at);
+            if (axis.actions.contains(ScriptAxisAction{newAt, 0}) && !isSelected(newAt))
+                return; // would collide with an unselected neighbour — skip this member
+        }
+
+        auto newSelView = axis.selection | std::views::transform([&](const auto &a) {
+                              return ScriptAxisAction{nudged(a.at), a.pos};
+                          });
+        VectorSet<ScriptAxisAction> newSel(newSelView.begin(), newSelView.end());
+
+        project.mutate(
+            role,
+            [&](AxisState &a) {
+                auto rebuiltView = a.actions | std::views::transform([&](const auto &action) {
+                                       if (isSelected(action.at))
+                                           return ScriptAxisAction{nudged(action.at), action.pos};
+                                       return action;
+                                   });
+                a.actions = VectorSet<ScriptAxisAction>(rebuiltView.begin(), rebuiltView.end());
+                a.selection = newSel;
+            },
+            eq);
+
+        if (event.seekAfter && role == event.axis && !newSel.empty())
+            leadSeek = newSel.begin()->at;
+    });
+    if (leadSeek)
         eq.push(SeekEvent{*leadSeek});
 }
 

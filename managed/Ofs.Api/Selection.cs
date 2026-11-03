@@ -12,8 +12,9 @@ namespace Ofs
     /// </summary>
     public enum SelectGesture
     {
-        /// <summary>Marquee / time-range drag — every action in [<see cref="SelectRequest.StartTime"/>,
-        /// <see cref="SelectRequest.EndTime"/>] (the native resolution ignores the position range).</summary>
+        /// <summary>Marquee drag — every action in time [<see cref="SelectRequest.StartTime"/>,
+        /// <see cref="SelectRequest.EndTime"/>] and intensity [<see cref="SelectRequest.StartPos"/>,
+        /// <see cref="SelectRequest.EndPos"/>] (inclusive).</summary>
         Box = 0,
         /// <summary>Select-all (Ctrl+A) — every action on the axis.</summary>
         All = 1,
@@ -38,12 +39,16 @@ namespace Ofs
         public double EndTime { get; }
         /// <summary>Point: the clicked position.</summary>
         public int Pos { get; }
+        /// <summary>Box: inclusive intensity/pos floor (0-100). Defaults to 0.</summary>
+        public int StartPos { get; }
+        /// <summary>Box: inclusive intensity/pos ceiling (0-100). Defaults to 100.</summary>
+        public int EndPos { get; }
 
         internal SelectRequest(SelectGesture gesture, StandardAxis axis, double startTime, double endTime,
-            int pos)
+            int pos, int startPos = 0, int endPos = 100)
         {
             Gesture = gesture; Axis = axis; StartTime = startTime; EndTime = endTime;
-            Pos = pos;
+            Pos = pos; StartPos = startPos; EndPos = endPos;
         }
     }
 
@@ -192,7 +197,7 @@ namespace Ofs
             if (slot?.OnSelect == null || inp == null) return (int)OfsSelectDisposition.Pass; // released → native
             var axis = (inp->Axis >= 0 && inp->Axis < (int)StandardAxis.Count) ? (StandardAxis)inp->Axis : StandardAxis.L0;
             var req = new SelectRequest((SelectGesture)inp->Gesture, axis, inp->StartTime, inp->EndTime,
-                inp->Pos);
+                inp->Pos, inp->StartPos, inp->EndPos);
             SelectResult result = PluginGuard.Run("selectmode:onSelect", () => slot.OnSelect(req), SelectResult.Pass);
             if (result.Disposition == OfsSelectDisposition.Replace && result.Actions != null && emit != null)
                 foreach (ScriptAction a in result.Actions)
